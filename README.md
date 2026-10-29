@@ -18,33 +18,44 @@ you can do (a GitHub token, a GitHub OAuth App, `minikube tunnel`).
   [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo,admin:repo_hook&description=ai-scan-repos-installer)
   with `repo` and `admin:repo_hook`.
 - For minikube: a cluster with at least 8 GB of memory, or the Jenkins builds starve it. A separate
-  profile leaves your other clusters alone: `minikube start -p ai-scan --cpus 6 --memory 10g --container-runtime=docker`
+  profile leaves your other clusters alone: 
+  ```bash
+  minikube start -p ai-scan --cpus 6 --memory 10g --container-runtime=docker
+  ```
   (then run the installer with `--network ai-scan`, pick the context `ai-scan`, and use `minikube tunnel -p ai-scan`).
 - For EKS: an AWS account; either a `~/.aws` profile or access keys.
 
 ## Run it
 
-Windows (PowerShell), minikube:
+### MacOS / Linux (bash):
+
+```bash
+docker run --rm -it \
+  -p 127.0.0.1:8088:8088 \
+  -p 127.0.0.1:8081-8083:8081-8083 \
+  --network minikube \
+  --add-host host.docker.internal:host-gateway \
+  -v ai-scan-installer:/data \
+  -v "$HOME/.kube:/host/kube:ro" \
+  -v "$HOME/.minikube:/host/minikube:ro" \
+  -v "$HOME/.aws:/root/.aws:ro" \
+  ghcr.io/<your-org>/ai-scanner-installer:latest
+```
+
+Replace `<your-org>` with the GitHub org or user that publishes the installer image.
+
+
+### Windows (PowerShell), minikube:
 
 ```powershell
 docker run --rm -it -p 127.0.0.1:8088:8088 -p 127.0.0.1:8081-8083:8081-8083 --network minikube `
   -v ai-scan-installer:/data `
   -v "$env:USERPROFILE\.kube:/host/kube:ro" -v "$env:USERPROFILE\.minikube:/host/minikube:ro" `
   -v "$env:USERPROFILE\.aws:/root/.aws:ro" `
-  ghcr.io/devopscourse22/ai-scanner-installer:latest
+  ghcr.io/<your-org>/ai-scanner-installer:latest
 ```
 
-macOS / Linux (bash):
-
-```bash
-docker run --rm -it -p 127.0.0.1:8088:8088 -p 127.0.0.1:8081-8083:8081-8083 --network minikube \
-  --add-host host.docker.internal:host-gateway \
-  -v ai-scan-installer:/data \
-  -v "$HOME/.kube:/host/kube:ro" -v "$HOME/.minikube:/host/minikube:ro" -v "$HOME/.aws:/root/.aws:ro" \
-  ghcr.io/devopscourse22/ai-scanner-installer:latest
-```
-
-Then open <http://localhost:8088>.
+Then open <http://localhost:8088>
 
 - Leave out `--network minikube` for any target other than minikube (always for EKS).
 - Start minikube **before** the installer. If the installer joins a stopped minikube's network,
@@ -94,11 +105,11 @@ EKS), on ports the `docker run` line publishes on 127.0.0.1 only:
 | Service | Address | Login |
 |---|---|---|
 | Jenkins | http://localhost:8081 | `admin` + the install's admin password |
-| Argo CD | http://localhost:8082 | same |
-| Grafana (with Prometheus) | http://localhost:8083 | same |
+| Argo CD | http://localhost:8082 | Same Credentials |
+| Grafana (with Prometheus) | http://localhost:8083 | Same Credentials |
 
-On **EKS** each of the three gets its own AWS load balancer instead, and the panel
-links to those `...elb.amazonaws.com` addresses (Jenkins on port 8080).
+On **EKS** each of the three gets its own (ALB) AWS load balancer instead, and the panel
+links to those domain `...elb.amazonaws.com` addresses (Jenkins on port 8080).
 
 The wizard shows the password (Show / Copy). It is generated once per install and
 kept in the encrypted answers; Argo CD stores only its bcrypt hash.
@@ -112,6 +123,45 @@ On "Where it runs", open **Add an HTTPS certificate** and choose the certificate
 has not expired. The Ingress then serves HTTPS with it, on minikube, a server or
 EKS (no ACM certificate is created then). Point the name at the cluster: a DNS
 record, or the hosts file for a local minikube.
+
+### Generate a certificate for local testing
+
+For a private test deployment, OpenSSL can create a self-signed certificate.
+Choose a DNS name you will use as the app address, and use that exact name in
+the certificate's Subject Alternative Name (SAN). For example:
+
+```bash
+mkdir -p local-tls
+cd local-tls
+umask 077
+openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 365 \
+  -keyout app.key \
+  -out app.crt \
+  -subj "/CN=ai-scan.local" \
+  -addext "subjectAltName=DNS:ai-scan.local"
+```
+
+In the wizard, set the app address to `https://ai-scan.local`, upload
+`app.crt` as the certificate and `app.key` as the private key, then select
+**Check certificate**. Make `ai-scan.local` resolve to the cluster's ingress
+address on the machines that need to open the app (for a local cluster, use a
+hosts-file entry). The private key is unencrypted so the wizard can read it;
+keep `app.key` private and do not commit or share it. The installer stores
+uploaded answers encrypted on its data volume.
+
+> Note - Self-signed certificate encrypts traffic but browsers and other clients
+will not trust it by default, so expect a certificate warning unless you
+explicitly trust it on each client. Do not use this as a publicly trusted
+production certificate.
+
+For an internet-facing deployment, use a certificate issued by a trusted
+certificate authority (for example, through your organization's PKI or an
+ACME provider such as Let's Encrypt). Obtain the certificate for the exact
+hostname and upload the leaf certificate together with its intermediate
+chain, plus its matching unencrypted private key. Configure DNS to point that
+hostname at the cluster before use. Protect the private key, and never commit
+it to Git. This installer option uses the uploaded certificate directly; it
+does not request or manage an ACM certificate on EKS.
 
 ## Secrets
 
