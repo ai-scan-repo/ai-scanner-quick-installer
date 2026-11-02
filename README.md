@@ -39,10 +39,15 @@ docker run --rm -it \
   -v "$HOME/.kube:/host/kube:ro" \
   -v "$HOME/.minikube:/host/minikube:ro" \
   -v "$HOME/.aws:/root/.aws:ro" \
-  ghcr.io/<your-org>/ai-scanner-installer:latest
+  docker.io/<dockerhub-user>/ai-scanner-installer:latest
 ```
 
-Replace `<your-org>` with the GitHub org or user that publishes the installer image.
+Use the URI for the registry where you published the installer image. For
+Docker Hub, replace `<dockerhub-user>` with your Docker Hub namespace. For ECR,
+replace the image URI with
+`<account-id>.dkr.ecr.<region>.amazonaws.com/ai-scanner-installer:latest`.
+The image must already be published there, and Docker must be authenticated
+to that registry. Use the same image URI in the Windows example below.
 
 
 ### Windows (PowerShell), minikube:
@@ -52,7 +57,7 @@ docker run --rm -it -p 127.0.0.1:8088:8088 -p 127.0.0.1:8081-8083:8081-8083 --ne
   -v ai-scan-installer:/data `
   -v "$env:USERPROFILE\.kube:/host/kube:ro" -v "$env:USERPROFILE\.minikube:/host/minikube:ro" `
   -v "$env:USERPROFILE\.aws:/root/.aws:ro" `
-  ghcr.io/<your-org>/ai-scanner-installer:latest
+  docker.io/<dockerhub-user>/ai-scanner-installer:latest
 ```
 
 Then open <http://localhost:8088>
