@@ -438,7 +438,7 @@ function Repos({ a, patch }: StepProps) {
   async function run() {
     setBusy(true); setErr("");
     try {
-      const res = await api.checkGithub(r.owner ?? "", r.token ?? "");
+      const res = await api.checkGithub(r.owner ?? "", r.token ?? "", r.installer_repo ?? "");
       setCheck(res);
       if (res.login) patch((x) => { x.repos = { ...(x.repos ?? {}), login: res.login }; });
     } catch (e) { setErr((e as Error).message); }
@@ -448,9 +448,9 @@ function Repos({ a, patch }: StepProps) {
     <section className="step">
       <h1>Which repositories?</h1>
       <div className="grid2">
-        <Field label="GitHub owner" value={r.owner} hint="DevOpsCourse22, or your own account if you forked the six repositories."
+        <Field label="GitHub owner" value={r.owner} hint="The owner of the six code and deployment repositories; use your fork's owner if applicable."
                onChange={(v) => patch((x) => { x.repos = { ...(x.repos ?? {}), owner: v.trim() }; })} />
-        <Field label="Installer repository" value={r.installer_repo} placeholder="DevOpsCourse22/ai-scanner-installer"
+        <Field label="Installer repository" value={r.installer_repo} placeholder="ai-scan-repo/ai-scanner-quick-installer"
                hint="This install's manifests and pipelines go to a branch here. The six project repositories are only read."
                onChange={(v) => patch((x) => { x.repos = { ...(x.repos ?? {}), installer_repo: v.trim() || undefined }; })} />
         <Field label="GitHub token" secret saved={r.token_saved} value={r.token}

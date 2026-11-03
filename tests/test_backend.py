@@ -50,6 +50,35 @@ def test_answers_never_return_secrets_and_empty_keeps_them(api):
     assert appmod._session["answers"]["repos"]["token"] == "ghp_abcdefghij"
 
 
+def test_github_check_uses_installer_repo_from_current_request(api, monkeypatch):
+    client, appmod = api
+    assert client.post("/api/unlock", json={"passphrase": "longenough1", "new": True}).status_code == 200
+    appmod._session["answers"]["repos"] = {
+        "owner": "ai-scan-repo",
+        "installer_repo": "DevOpsCourse22/ai-scanner-installer",
+        "token": "ghp_abcdefghij",
+    }
+    checked = {}
+
+    def fake_check(token, owner, installer_repo):
+        checked.update(token=token, owner=owner, installer_repo=installer_repo)
+        return {"ok": True, "login": "test-user", "repos": [], "problems": []}
+
+    monkeypatch.setattr(appmod.github, "check", fake_check)
+    response = client.post("/api/check/github", json={
+        "owner": "ai-scan-repo",
+        "token": "ghp_abcdefghij",
+        "installer_repo": "ai-scan-repo/ai-scanner-quick-installer",
+    })
+
+    assert response.status_code == 200
+    assert checked == {
+        "token": "ghp_abcdefghij",
+        "owner": "ai-scan-repo",
+        "installer_repo": "ai-scan-repo/ai-scanner-quick-installer",
+    }
+
+
 def test_validate_lists_what_is_missing():
     from installer.app import validate
     miss = validate({"target": {"kind": "eks", "eks": {}}, "ai": {"mode": "cloud"}})

@@ -175,6 +175,7 @@ def _strip_none(d: dict[str, Any]) -> None:
 class GithubCheck(BaseModel):
     owner: str
     token: str = ""
+    installer_repo: str = ""
 
 
 @app.post("/api/check/github")
@@ -183,7 +184,8 @@ def check_github(body: GithubCheck) -> dict[str, Any]:
     if not token:
         raise HTTPException(400, "Paste a GitHub token first.")
     try:
-        res = github.check(token, body.owner, _get(_answers(), "repos.installer_repo") or "")
+        installer_repo = body.installer_repo or _get(_answers(), "repos.installer_repo") or ""
+        res = github.check(token, body.owner, installer_repo)
     except httpx.HTTPError as exc:
         raise HTTPException(502, f"GitHub could not be reached: {exc}") from exc
     if res.get("login"):

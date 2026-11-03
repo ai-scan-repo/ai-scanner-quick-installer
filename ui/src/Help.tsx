@@ -4,7 +4,7 @@
 const GUIDE: { title: string; text: string }[] = [
   { title: "Saved answers", text: "Choose a passphrase. It encrypts everything you type, so a later run can upgrade or remove the install." },
   { title: "Where it runs", text: "A cluster on this computer (minikube), a server you reach over SSH, or Amazon EKS, which Terraform creates for you." },
-  { title: "Repositories", text: "Keep DevOpsCourse22, paste a GitHub token, press Check access. Every line should be green." },
+  { title: "Repositories", text: "Choose the owner of the six code and deployment repositories, and enter the installer repository (for example, ai-scan-repo/ai-scanner-quick-installer). Paste a GitHub token and press Check access; every line should be green." },
   { title: "AI model", text: "The model reviews use by default: a model server on your network, one on your tailnet, or a cloud provider with its key." },
   { title: "Admins", text: "GitHub usernames that may change the app's settings." },
   { title: "Main menu", text: "Check the summary and press Deploy. Later, the same page shows your install, its links, Upgrade and Remove." },
@@ -19,7 +19,7 @@ const FAQ: { q: string; a: string }[] = [
   { q: "My cluster is not in the list on \"Where it runs\".",
     a: "The installer reads every kubeconfig in your .kube folder. Start the cluster first (minikube start), then restart the installer. For minikube, add --network minikube (or --network <profile>) to docker run." },
   { q: "\"Check access\" shows red lines.",
-    a: "The token cannot see or change that repository. Create a classic token with repo and admin:repo_hook, and make sure your GitHub user has access to the DevOpsCourse22 repositories." },
+    a: "The token cannot see or change that repository. Create a classic token with repo and admin:repo_hook, and make sure your GitHub user has access to the six project repositories and push access to the selected installer repository." },
   { q: "What is the GitHub OAuth App and why do I make it?",
     a: "It lets people sign in to the app with GitHub. GitHub has no way to create it automatically, so the installer shows the exact two addresses to paste on github.com/settings/applications/new, then asks for its client ID and secret." },
   { q: "The deploy waits for \"minikube tunnel\".",

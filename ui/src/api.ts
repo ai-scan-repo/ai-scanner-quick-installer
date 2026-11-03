@@ -53,10 +53,10 @@ export const api = {
   getAnswers: () => call<{ answers: Answers }>("GET", "/api/answers"),
   checkAnswers: () => call<{ missing: string[] }>("GET", "/api/check/answers"),
   save: (answers: Answers) => call<{ answers: Answers }>("PUT", "/api/answers", { answers }),
-  checkGithub: (owner: string, token: string) => call<{
+  checkGithub: (owner: string, token: string, installerRepo: string) => call<{
     ok: boolean; login?: string; error?: string; problems?: string[];
     repos?: { name: string; found: boolean; private: boolean | null; push: boolean; admin: boolean }[];
-  }>("POST", "/api/check/github", { owner, token }),
+  }>("POST", "/api/check/github", { owner, token, installer_repo: installerRepo }),
   checkTarget: () => call<{ installed: boolean; error?: string; flavour?: { kind: string; node_ip: string } }>(
     "POST", "/api/check/target"),
   checkModel: (endpoint: string) => call<{ ok: boolean; models?: string[]; error?: string }>(
