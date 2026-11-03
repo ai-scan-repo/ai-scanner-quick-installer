@@ -17,6 +17,10 @@ you can do (a GitHub token, a GitHub OAuth App, `minikube tunnel`).
   repositories and push to this one, created at
   [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo,admin:repo_hook&description=ai-scan-repos-installer)
   with `repo` and `admin:repo_hook`.
+  This creates a personal access token under the GitHub account currently signed in.
+  > That account must have the required repository access, and
+  organization SSO or token-approval policies may require additional authorization.
+  
 - For minikube: a cluster with at least 8 GB of memory, or the Jenkins builds starve it. A separate
   profile leaves your other clusters alone: 
   ```bash
@@ -25,7 +29,51 @@ you can do (a GitHub token, a GitHub OAuth App, `minikube tunnel`).
   (then run the installer with `--network ai-scan`, pick the context `ai-scan`, and use `minikube tunnel -p ai-scan`).
 - For EKS: an AWS account; either a `~/.aws` profile or access keys.
 
+## Build and publish the installer image
+
+Run these commands from the repository root. Authenticate to Docker Hub first:
+
+```bash
+docker buildx create --name ai-scan-builder --use
+docker buildx inspect --bootstrap
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t docker.io/aviel770/ai-scanner-installer:latest \
+  --push .
+```
+
+The `--platform` option builds one image for both 64-bit Intel/AMD (`amd64`)
+and ARM (`arm64`) Linux systems; `--push` publishes the multi-platform image
+and its manifest to the selected registry. You can replace `latest` with a
+version tag and use a registry-specific image name, such as an ECR URI:
+`<account-id>.dkr.ecr.<region>.amazonaws.com/ai-scanner-installer:<tag>`.
+Create the named builder only once; if it already exists, select it with
+`docker buildx use ai-scan-builder` before building.
+
+To build a single platform and load the result into the local Docker image
+store for testing, use `--load` instead. Omitting `--platform` targets the
+builder's native platform; you can specify `linux/arm64` for Apple Silicon or
+ARM Linux, or `linux/amd64` for Intel/AMD Linux:
+
+```bash
+docker buildx build -t ai-scanner-installer:local --load .
+```
+
+`.dockerignore` keeps files that are not needed for the image build out of the
+Docker build context, including Git metadata, tests, QA materials, Markdown
+documentation, Python caches, Terraform state/cache, and generated UI files.
+These files remain in the repository for development and debugging. The
+Dockerfile builds the UI in its own stage and copies only the built UI and
+installer runtime files into the final image.
+
 ## Run it
+
+- Leave out `--network minikube` for any target other than minikube (always for EKS).
+- Start minikube **before** the installer. If the installer joins a stopped minikube's network,
+  it takes the node's address and minikube then fails with "Address already in use".
+- Leave out the `.aws` mount if you will type AWS keys in the wizard, or are not using EKS.
+- The volume `ai-scan-installer` keeps your encrypted answers and the Terraform
+  state. Keep it until you have pressed Destroy, or EKS keeps costing money.
 
 ### MacOS / Linux (bash):
 
@@ -39,12 +87,11 @@ docker run --rm -it \
   -v "$HOME/.kube:/host/kube:ro" \
   -v "$HOME/.minikube:/host/minikube:ro" \
   -v "$HOME/.aws:/root/.aws:ro" \
-  docker.io/<dockerhub-user>/ai-scanner-installer:latest
+  docker.io/aviel770/ai-scanner-installer:latest
 ```
 
-Use the URI for the registry where you published the installer image. For
-Docker Hub, replace `<dockerhub-user>` with your Docker Hub namespace. For ECR,
-replace the image URI with
+The Docker Hub image is
+`docker.io/aviel770/ai-scanner-installer:latest`. For ECR, replace the image URI with
 `<account-id>.dkr.ecr.<region>.amazonaws.com/ai-scanner-installer:latest`.
 The image must already be published there, and Docker must be authenticated
 to that registry. Use the same image URI in the Windows example below.
@@ -57,22 +104,22 @@ docker run --rm -it -p 127.0.0.1:8088:8088 -p 127.0.0.1:8081-8083:8081-8083 --ne
   -v ai-scan-installer:/data `
   -v "$env:USERPROFILE\.kube:/host/kube:ro" -v "$env:USERPROFILE\.minikube:/host/minikube:ro" `
   -v "$env:USERPROFILE\.aws:/root/.aws:ro" `
-  docker.io/<dockerhub-user>/ai-scanner-installer:latest
+  docker.io/aviel770/ai-scanner-installer:latest
 ```
 
 Then open <http://localhost:8088>
 
-- Leave out `--network minikube` for any target other than minikube (always for EKS).
-- Start minikube **before** the installer. If the installer joins a stopped minikube's network,
-  it takes the node's address and minikube then fails with "Address already in use".
-- Leave out the `.aws` mount if you will type AWS keys in the wizard, or are not using EKS.
-- The volume `ai-scan-installer` keeps your encrypted answers and the Terraform
-  state. Keep it until you have pressed Destroy, or EKS keeps costing money.
-
 ## What it does
 
-The six project repositories are only **read**. Everything an install writes
-goes to a branch of this repository, `env/local` or `env/eks`:
+The wizard commits generated deployment files to the Installer repository
+(default: `ai-scan-repo/ai-scanner-quick-installer`) on a new branch `env/local` (for local running / Debug) or
+`env/eks` branch (When running on AWS).  
+This branch is the GitOps source: Argo CD deploys from it,
+and Jenkins updates image tags there. Keeping it separate avoids mixing
+generated deployment files with the repository's main branch. You can choose a
+different Installer repository in the wizard. The six code and deployment
+repositories are only **read**, except that webhooks are added to the three
+code repositories:
 
 ```
 env/<env>
@@ -103,9 +150,11 @@ deletes it again.
 
 ## Jenkins, Argo CD and Grafana
 
-Press **Jenkins, Argo CD, Grafana** at the top of the wizard, then **Open all three**.
+Press **Jenkins, Argo CD, Grafana** at the top right of the wizard, then click on the **Open all three**.
 The installer keeps a port-forward to each one, for any target (minikube, a server,
 EKS), on ports the `docker run` line publishes on 127.0.0.1 only:
+
+> The wizard generates the password. Use **Show** to view it or **Copy** to copy it.
 
 | Service | Address | Login |
 |---|---|---|
@@ -175,6 +224,22 @@ the volume, encrypted with your passphrase (scrypt + AES-GCM). Inside the
 cluster they become Kubernetes Secrets. The log never shows them. Nothing is
 written to git except the overlays, which hold no secrets.
 
+## Clean up a local Minikube node
+
+To remove the installed platform, use **Remove/Destroy** in the wizard while
+the installer and cluster are still running. To delete the entire Minikube
+cluster afterward, including all data stored in it, run:
+
+```bash
+minikube delete -p ai-scan
+```
+
+This removes the `ai-scan` Minikube profile, but does not remove the installer
+Docker image or the separate Buildx builder. To stop the cluster temporarily
+and keep it for later, run `minikube stop -p ai-scan` instead. Verify the
+profile was deleted with `minikube profile list`. Use Minikube to manage its
+node; do not remove the node container directly with `docker rm`.
+
 ## Developing
 
 ```bash
@@ -182,5 +247,3 @@ pip install -r requirements-dev.txt && pytest -q
 uvicorn installer.app:app --port 8088        # the API
 cd ui && npm install && npm run dev           # the page, proxied to the API
 ```
-
-Build for both architectures: `docker buildx build --platform linux/amd64,linux/arm64 -t <name> --push .`

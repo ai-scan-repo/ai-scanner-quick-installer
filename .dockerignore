@@ -2,6 +2,8 @@ ui/node_modules
 ui/dist
 .git
 tests
+qa
 **/__pycache__
 **/.terraform
 *.tfstate*
+*.md

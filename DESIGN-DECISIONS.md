@@ -5,7 +5,7 @@ Chosen by Elad on 2026-10-09, one question at a time.
 | # | Topic | Decision |
 |---|---|---|
 | 1 | Form factor | One Docker image: `docker run`, open `http://localhost:8088`, the wizard does the rest. Contains kubectl, helm, kustomize, terraform, aws cli, git, ssh. |
-| 2 | Code home | New repo `DevOpsCourse22/ai-scanner-installer`. |
+| 2 | Code home | `ai-scan-repo/ai-scanner-quick-installer` (originally `DevOpsCourse22/ai-scanner-installer`). |
 | 3 | Architectures | amd64 + arm64 (buildx). |
 | 4 | Images | Built exactly as today (Jenkins + BuildKit). Local: the in-cluster registry. AWS: ECR. |
 | 4a | Local scope | Full platform, same as K3S-SRV: registry, Jenkins (Helm) with the 3 pipelines, smee, Argo CD, the app. |
