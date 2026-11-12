@@ -1,7 +1,16 @@
 # AI Scan Repos installer
 
 One Docker image that deploys AI Scan Repos with its full platform (image
-registry, Jenkins with the three pipelines, GitHub webhooks, Argo CD) to:
+registry, Jenkins with three pipelines, GitHub webhooks, and Argo CD).  
+During installation, it reads the three application repositories
+(`ai-scanner-backend`, `ai-scanner-gateway`, and `ai-scanner-frontend`) and
+clones their matching deployment repositories (`*-deployment`) from the GitHub
+owner you specify in the wizard. It also uses the selected Installer
+repository to store generated deployment files and pipelines.  
+The repository
+list is defined in [`installer/github.py`](installer/github.py), and the
+installer clones the selected repositories during setup in
+[`installer/plans.py`](installer/plans.py). It can deploy to:
 
 - a cluster on your computer (minikube, Docker Desktop, any kube context),
 - a server you can SSH into (K3s or kubeadm),
@@ -12,12 +21,12 @@ you can do (a GitHub token, a GitHub OAuth App, `minikube tunnel`).
 
 ## Before you start
 
-- Docker.
+- **Docker** and **Docker Buildx** install
 - A GitHub token that can read the six project repositories, add webhooks to the three code
   repositories and push to this one, created at
   [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo,admin:repo_hook&description=ai-scan-repos-installer)
   with `repo` and `admin:repo_hook`.
-  This creates a personal access token under the GitHub account currently signed in.
+  This PAT token creates a personal access token under the GitHub account currently signed in.
   > That account must have the required repository access, and
   organization SSO or token-approval policies may require additional authorization.
   
@@ -68,7 +77,7 @@ installer runtime files into the final image.
 
 ## Run it
 
-- Leave out `--network minikube` for any target other than minikube (always for EKS).
+- For this `ai-scan` Minikube profile, use `--network ai-scan` and select the `ai-scan` context in the wizard. Leave out `--network` for any target other than Minikube (always for EKS).
 - Start minikube **before** the installer. If the installer joins a stopped minikube's network,
   it takes the node's address and minikube then fails with "Address already in use".
 - Leave out the `.aws` mount if you will type AWS keys in the wizard, or are not using EKS.
@@ -81,7 +90,7 @@ installer runtime files into the final image.
 docker run --rm -it \
   -p 127.0.0.1:8088:8088 \
   -p 127.0.0.1:8081-8083:8081-8083 \
-  --network minikube \
+  --network ai-scan \
   --add-host host.docker.internal:host-gateway \
   -v ai-scan-installer:/data \
   -v "$HOME/.kube:/host/kube:ro" \
@@ -100,7 +109,7 @@ to that registry. Use the same image URI in the Windows example below.
 ### Windows (PowerShell), minikube:
 
 ```powershell
-docker run --rm -it -p 127.0.0.1:8088:8088 -p 127.0.0.1:8081-8083:8081-8083 --network minikube `
+docker run --rm -it -p 127.0.0.1:8088:8088 -p 127.0.0.1:8081-8083:8081-8083 --network ai-scan `
   -v ai-scan-installer:/data `
   -v "$env:USERPROFILE\.kube:/host/kube:ro" -v "$env:USERPROFILE\.minikube:/host/minikube:ro" `
   -v "$env:USERPROFILE\.aws:/root/.aws:ro" `
@@ -108,6 +117,14 @@ docker run --rm -it -p 127.0.0.1:8088:8088 -p 127.0.0.1:8081-8083:8081-8083 --ne
 ```
 
 Then open <http://localhost:8088>
+
+### Troubleshooting: `409 Conflict` from `/api/services`
+
+If the installer terminal CLI returning `409 Conflict`, open the wizard browser and unlock your saved
+answers using the passphrase you created the first time you ran the installer.
+The services panel needs the unlocked answers to show Jenkins, Argo CD, and
+Grafana links. Keep the `ai-scan-installer` Docker volume; it contains the
+encrypted answers needed to unlock them.
 
 ## What it does
 
